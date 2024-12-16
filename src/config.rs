@@ -19,6 +19,7 @@ pub struct Config {
 pub struct ServiceConfig {
     pub service: String,
     pub key: Option<String>,
+    pub spatula: Option<String>,
     pub visibility_label: Option<String>,
     #[serde(default = "default_format")]
     pub format: String,

@@ -31,6 +31,10 @@ impl Fetcher {
             request = request.header("x-goog-api-key", key);
         }
 
+        if let Some(spatula) = &service.spatula {
+            request = request.header("x-goog-spatula", spatula);
+        }
+
         let response = request.send().await?;
         let content = response.text().await?;
         Ok(content)
