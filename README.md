@@ -4,6 +4,8 @@
 Tracker for changes in [Google Discovery Documents](https://developers.google.com/discovery) with optional Discord webhook support written in Rust.
 
 ![Local API](./static/local_api.png)
+![Local API](./static/webhook.png)
+
 
 ### Installation via Docker (linux/wsl)
 
