@@ -207,12 +207,13 @@ impl DiffEngine {
                         }),
                     }
                 }
-                for key in old_resources.keys() {
+                for (key, old_resource) in old_resources {
                     if !new_resources.contains_key(key) {
+                        // If entire resource is deleted
                         deletions.push(Change {
                             path: format!("/resources/{}", key),
                             value: None,
-                            old_value: None,
+                            old_value: Some(serde_json::to_value(old_resource).unwrap()),
                             new_value: None,
                         });
                     }
@@ -261,12 +262,12 @@ impl DiffEngine {
                         }),
                     }
                 }
-                for key in old_methods.keys() {
+                for (key, old_method) in old_methods {
                     if !new_methods.contains_key(key) {
                         deletions.push(Change {
                             path: format!("{}/methods/{}", path, key),
                             value: None,
-                            old_value: None,
+                            old_value: Some(serde_json::to_value(old_method).unwrap()),
                             new_value: None,
                         });
                     }
