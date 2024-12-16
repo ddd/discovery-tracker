@@ -25,19 +25,10 @@ impl Fetcher {
 
     async fn fetch_document(&self, service: &ServiceConfig) -> Result<String> {
         let url = self.build_url(service);
-        let mut request = if service.features.contains(&"post_to_get_override".to_string()) {
-            self.client.post(&url)
-        } else {
-            self.client.get(&url)
-        };
-
+        let mut request = self.client.get(&url);
+ 
         if let Some(key) = &service.key {
             request = request.header("x-goog-api-key", key);
-        }
-
-        if service.features.contains(&"post_to_get_override".to_string()) {
-            request = request.header("x-http-method-override", "GET");
-            request = request.header("content-length", "0");
         }
 
         let response = request.send().await?;

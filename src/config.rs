@@ -20,14 +20,13 @@ pub struct ServiceConfig {
     pub service: String,
     pub key: Option<String>,
     pub visibility_label: Option<String>,
-    #[serde(default)]
-    pub features: Vec<String>,
     #[serde(default = "default_format")]
     pub format: String,
 }
 
 #[derive(Clone, Deserialize)]
 pub struct DiscordWebhookConfig {
+    pub tracker_api_url: String,
     pub tag_mention_role_ids: Vec<TagMentionRoleId>,
     pub services: Vec<ServiceWebhook>,
 }

@@ -32,15 +32,13 @@ struct DiscordEmbedFooter {
 pub struct DiscordNotifier {
     client: Client,
     config: DiscordWebhookConfig,
-    base_url: String,
 }
 
 impl DiscordNotifier {
-    pub fn new(config: DiscordWebhookConfig, base_url: String) -> Self {
+    pub fn new(config: DiscordWebhookConfig) -> Self {
         DiscordNotifier {
             client: Client::new(),
             config,
-            base_url,
         }
     }
 
@@ -66,7 +64,7 @@ impl DiscordNotifier {
                 author: DiscordEmbedAuthor {
                     name: service_config.name.clone(),
                     url: format!("{}/api/changes/{}/{}/diff", 
-                        self.base_url, 
+                        self.config.tracker_api_url, 
                         change.service, 
                         change.timestamp
                     ),

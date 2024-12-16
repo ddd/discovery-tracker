@@ -47,7 +47,6 @@ async fn main() -> Result<()> {
         if let Some(discord_config) = config.discord_webhook_config.clone() {
             Some(DiscordNotifier::new(
                 discord_config,
-                "http://localhost:3000".to_string(), // Or configure this in config.yaml
             ))
         } else {
             None
