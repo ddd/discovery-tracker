@@ -26,7 +26,7 @@ vim config.yaml
 Start the container
 
 ```
-sudo docker compose up -d
+sudo docker compose up -d --build
 ```
 
 The local API will be available at http://localhost:3000
