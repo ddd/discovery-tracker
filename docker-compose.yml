@@ -1,0 +1,9 @@
+services:
+  discovery-tracker:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
