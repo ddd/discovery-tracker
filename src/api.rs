@@ -152,7 +152,7 @@ async fn root() -> impl IntoResponse {
 
 async fn status(State(state): State<AppState>) -> impl IntoResponse {
     let uptime = state.api.start_time.elapsed().as_secs();
-    let services = state.api.storage.retrieve_all().unwrap();
+    let services = state.api.storage.retrieve_all().await.unwrap();
     let service_names: Vec<String> = services.keys().cloned().collect();
 
     Json(serde_json::json!({
@@ -165,7 +165,7 @@ async fn diff_format_change(
     State(state): State<AppState>,
     Path((service, timestamp)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let change = state.api.change_logger.get_specific_change(&service, &timestamp).unwrap();
+    let change = state.api.change_logger.get_specific_change(&service, &timestamp).await.unwrap();
     
     let mut diff_entries = Vec::new();
 
@@ -241,7 +241,7 @@ async fn all_changes(
     Query(params): Query<PaginationParams>,
 ) -> impl IntoResponse {
     let (offset, max_results) = get_pagination_params(params);
-    let all_changes = state.api.change_logger.get_all_changes(offset, max_results + 1).unwrap();
+    let all_changes = state.api.change_logger.get_all_changes(offset, max_results + 1).await.unwrap();
     let has_more = all_changes.len() > max_results;
     let changes = all_changes.into_iter().take(max_results)
         .map(|change| ChangeSummary {
@@ -271,7 +271,7 @@ async fn service_changes(
     Query(params): Query<PaginationParams>,
 ) -> impl IntoResponse {
     let (offset, max_results) = get_pagination_params(params);
-    let changes = state.api.change_logger.get_changes_for_service(&service, offset, max_results + 1).unwrap();
+    let changes = state.api.change_logger.get_changes_for_service(&service, offset, max_results + 1).await.unwrap();
     let has_more = changes.len() > max_results;
     let summaries = changes.into_iter().take(max_results)
         .map(|change| ChangeSummary {
@@ -299,7 +299,7 @@ async fn specific_change(
     State(state): State<AppState>,
     Path((service, timestamp)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let change = state.api.change_logger.get_specific_change(&service, &timestamp).unwrap();
+    let change = state.api.change_logger.get_specific_change(&service, &timestamp).await.unwrap();
     
     let details = ChangeDetails {
         additions: change.additions.into_iter().map(|c| ChangeItem {
@@ -366,7 +366,7 @@ async fn get_document(
     State(state): State<AppState>,
     Path(service): Path<String>,
 ) -> impl IntoResponse {
-    match state.api.storage.retrieve(&service) {
+    match state.api.storage.retrieve(&service).await {
         Ok(Some(document)) => {
             // Convert to pretty-printed JSON
             let json_str = serde_json::to_string_pretty(&document).unwrap();

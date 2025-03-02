@@ -1,6 +1,6 @@
-use std::fs::{File, OpenOptions, create_dir_all};
 use std::path::{Path, PathBuf};
-use std::io::Write;
+use tokio::fs::{self, File};
+use tokio::io::AsyncWriteExt;
 use chrono::Utc;
 use anyhow::{Result, Context};
 use serde::{Serialize, Deserialize};
@@ -32,13 +32,13 @@ pub struct ChangeLogger {
 }
 
 impl ChangeLogger {
-    pub fn new<P: AsRef<Path>>(base_path: P) -> Result<Self> {
+    pub async fn new<P: AsRef<Path>>(base_path: P) -> Result<Self> {
         let base_path = base_path.as_ref().to_path_buf();
-        create_dir_all(&base_path).context("Failed to create change log directory")?;
+        fs::create_dir_all(&base_path).await.context("Failed to create change log directory")?;
         Ok(ChangeLogger { base_path })
     }
 
-    pub fn log_changes(&self, change_set: ChangeSet, _before: &DiscoveryDocument, after: &DiscoveryDocument) -> Result<LoggedChange> {
+    pub async fn log_changes(&self, change_set: ChangeSet, _before: &DiscoveryDocument, after: &DiscoveryDocument) -> Result<LoggedChange> {
         let mut tags = Vec::new();
         if self.has_new_method(&change_set) {
             tags.push("new_method".to_string());
@@ -67,63 +67,68 @@ impl ChangeLogger {
         let file_name = format!("{}-{}.json", logged_change.service, logged_change.timestamp);
         let file_path = self.base_path.join(file_name);
 
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(file_path)
-            .context("Failed to create change log file")?;
-
         let json = serde_json::to_string_pretty(&logged_change)
             .context("Failed to serialize logged change")?;
 
-        file.write_all(json.as_bytes())
+        let mut file = File::create(file_path).await
+            .context("Failed to create change log file")?;
+
+        file.write_all(json.as_bytes()).await
             .context("Failed to write change log")?;
 
         Ok(logged_change)
     }
 
-    pub fn get_all_changes(&self, offset: usize, limit: usize) -> Result<Vec<LoggedChange>> {
+    pub async fn get_all_changes(&self, offset: usize, limit: usize) -> Result<Vec<LoggedChange>> {
         let mut changes = Vec::new();
-        for entry in std::fs::read_dir(&self.base_path).context("Failed to read change log directory")? {
-            let entry = entry.context("Failed to read directory entry")?;
+        let mut read_dir = fs::read_dir(&self.base_path).await.context("Failed to read change log directory")?;
+        
+        while let Some(entry) = read_dir.next_entry().await.context("Failed to read directory entry")? {
             let path = entry.path();
             if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
-                let file = File::open(path).context("Failed to open change log file")?;
-                let logged_change: LoggedChange = serde_json::from_reader(file)
+                let content = fs::read_to_string(&path).await.context("Failed to read change log file")?;
+                let logged_change: LoggedChange = serde_json::from_str(&content)
                     .context("Failed to deserialize logged change")?;
                 changes.push(logged_change);
             }
         }
+        
         changes.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
         Ok(changes.into_iter().skip(offset).take(limit).collect())
     }
 
-    pub fn get_changes_for_service(&self, service: &str, offset: usize, limit: usize) -> Result<Vec<LoggedChange>> {
+    pub async fn get_changes_for_service(&self, service: &str, offset: usize, limit: usize) -> Result<Vec<LoggedChange>> {
         let mut changes = Vec::new();
-        for entry in std::fs::read_dir(&self.base_path).context("Failed to read change log directory")? {
-            let entry = entry.context("Failed to read directory entry")?;
+        let mut read_dir = fs::read_dir(&self.base_path).await.context("Failed to read change log directory")?;
+        
+        while let Some(entry) = read_dir.next_entry().await.context("Failed to read directory entry")? {
             let path = entry.path();
             if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
                 if let Some(file_name) = path.file_stem() {
-                    if file_name.to_str().unwrap().starts_with(service) {
-                        let file = File::open(path).context("Failed to open change log file")?;
-                        let logged_change: LoggedChange = serde_json::from_reader(file)
-                            .context("Failed to deserialize logged change")?;
-                        changes.push(logged_change);
+                    if let Some(name) = file_name.to_str() {
+                        if name.starts_with(service) {
+                            let content = fs::read_to_string(&path).await.context("Failed to read change log file")?;
+                            let logged_change: LoggedChange = serde_json::from_str(&content)
+                                .context("Failed to deserialize logged change")?;
+                            changes.push(logged_change);
+                        }
                     }
                 }
             }
         }
+        
         changes.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
         Ok(changes.into_iter().skip(offset).take(limit).collect())
     }
 
-    pub fn get_specific_change(&self, service: &str, timestamp: &str) -> Result<LoggedChange> {
+    pub async fn get_specific_change(&self, service: &str, timestamp: &str) -> Result<LoggedChange> {
         let file_name = format!("{}-{}.json", service, timestamp);
         let file_path = self.base_path.join(file_name);
 
-        let file = File::open(file_path).context("Failed to open change log file")?;
-        let logged_change: LoggedChange = serde_json::from_reader(file)
+        let content = fs::read_to_string(file_path).await
+            .context("Failed to open change log file")?;
+            
+        let logged_change: LoggedChange = serde_json::from_str(&content)
             .context("Failed to deserialize logged change")?;
 
         Ok(logged_change)

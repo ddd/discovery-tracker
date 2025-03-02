@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::path::PathBuf;
-use std::fs::File;
-use std::io::Read;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use anyhow::{Result, Context};
 
 #[derive(Clone, Deserialize)]
@@ -51,12 +51,14 @@ fn default_format() -> String {
 }
 
 impl Config {
-    pub fn load() -> Result<Self> {
+    pub async fn load() -> Result<Self> {
         let mut file = File::open("config.yaml")
+            .await
             .context("Failed to open config.yaml")?;
         
         let mut contents = String::new();
         file.read_to_string(&mut contents)
+            .await
             .context("Failed to read config.yaml")?;
 
         let config: Config = serde_yaml::from_str(&contents)
