@@ -132,7 +132,7 @@ async fn root() -> impl IntoResponse {
     <h3 id="getapidocumentsservice"><code>GET /api/documents/:service</code></h3>
     <ul>
     <li>What is returned: Pretty-printed JSON of the entire discovery document for the specified service.</li>
-    <li>Returns 404 if the service is not found.</li>
+    <li>Optional query parameter: <code>?dl=false</code> to view in browser instead of downloading.</li>
     </ul>
     <h3 id="getapichanges"><code>GET /api/changes</code></h3>
     <ul>
@@ -362,19 +362,38 @@ async fn shutdown_signal() {
     println!("signal received, starting graceful shutdown");
 }
 
+#[derive(Deserialize)]
+struct DownloadQueryParam {
+    dl: Option<String>,
+}
+
 async fn get_document(
     State(state): State<AppState>,
     Path(service): Path<String>,
+    Query(params): Query<DownloadQueryParam>,
 ) -> impl IntoResponse {
     match state.api.storage.retrieve(&service).await {
         Ok(Some(document)) => {
             // Convert to pretty-printed JSON
             let json_str = serde_json::to_string_pretty(&document).unwrap();
             
-            // Return with proper content type
-            axum::response::Response::builder()
+            // Check if download should be disabled
+            let disable_download = params.dl.unwrap_or_default() == "false";
+            
+            let mut response_builder = axum::response::Response::builder()
                 .status(axum::http::StatusCode::OK)
-                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .header(axum::http::header::CONTENT_TYPE, "application/json");
+                
+            // Add Content-Disposition header for download if not explicitly disabled
+            if !disable_download {
+                let filename = format!("{}-discovery.json", service);
+                response_builder = response_builder.header(
+                    axum::http::header::CONTENT_DISPOSITION, 
+                    format!("attachment; filename=\"{}\"", filename)
+                );
+            }
+            
+            response_builder
                 .body(axum::body::Body::from(json_str))
                 .unwrap()
         },
