@@ -104,6 +104,7 @@ impl Api {
         let app = Router::new()
             .route("/", get(root))
             .route("/api/status", get(status))
+            .route("/api/documents/:service", get(get_document))
             .route("/api/changes", get(all_changes))
             .route("/api/changes/:service", get(service_changes))
             .route("/api/changes/:service/:timestamp", get(specific_change))
@@ -127,6 +128,11 @@ async fn root() -> impl IntoResponse {
     <h3 id="getapistatus"><code>GET /api/status</code></h3>
     <ul>
     <li>What is returned: JSON object containing uptime information and a list of tracked services with their change counts.</li>
+    </ul>
+    <h3 id="getapidocumentsservice"><code>GET /api/documents/:service</code></h3>
+    <ul>
+    <li>What is returned: Pretty-printed JSON of the entire discovery document for the specified service.</li>
+    <li>Returns 404 if the service is not found.</li>
     </ul>
     <h3 id="getapichanges"><code>GET /api/changes</code></h3>
     <ul>
@@ -354,4 +360,35 @@ async fn shutdown_signal() {
     }
 
     println!("signal received, starting graceful shutdown");
+}
+
+async fn get_document(
+    State(state): State<AppState>,
+    Path(service): Path<String>,
+) -> impl IntoResponse {
+    match state.api.storage.retrieve(&service) {
+        Ok(Some(document)) => {
+            // Convert to pretty-printed JSON
+            let json_str = serde_json::to_string_pretty(&document).unwrap();
+            
+            // Return with proper content type
+            axum::response::Response::builder()
+                .status(axum::http::StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(json_str))
+                .unwrap()
+        },
+        Ok(None) => {
+            axum::response::Response::builder()
+                .status(axum::http::StatusCode::NOT_FOUND)
+                .body(axum::body::Body::from("Document not found for the specified service"))
+                .unwrap()
+        },
+        Err(_) => {
+            axum::response::Response::builder()
+                .status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+                .body(axum::body::Body::from("Failed to retrieve document"))
+                .unwrap()
+        },
+    }
 }
