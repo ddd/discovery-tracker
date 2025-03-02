@@ -30,8 +30,7 @@ discord_webhook_config:
 
 # Services to track
 services:    
-  - service: "staging-people-pa.sandbox.googleapis.com"
-    key: "AIzaSyBw7sMBdgAbgz9MAt0CzaIfKvAQB1wOTrc"
+  - service: "people-pa.googleapis.com"
   
   - service: "staging-youtube.sandbox.googleapis.com"
     key: "AIzaSyCG_6Rm6c7ucLr2NwAq33-vluCp2VfSkf0"
