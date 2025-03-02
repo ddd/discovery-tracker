@@ -12,16 +12,17 @@ struct DiscordWebhook {
 
 #[derive(Serialize)]
 struct DiscordEmbed {
+    title: Option<String>,
     description: String,
     color: u32,
     author: DiscordEmbedAuthor,
-    footer: DiscordEmbedFooter,
+    footer: Option<DiscordEmbedFooter>,
 }
 
 #[derive(Serialize)]
 struct DiscordEmbedAuthor {
     name: String,
-    url: String,
+    url: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -59,19 +60,79 @@ impl DiscordNotifier {
         let webhook = DiscordWebhook {
             content: if mentions.is_empty() { None } else { Some(mentions) },
             embeds: vec![DiscordEmbed {
+                title: None,
                 description,
                 color: 5814783, // Blue color
                 author: DiscordEmbedAuthor {
                     name: service_config.name.clone(),
-                    url: format!("{}/api/changes/{}/{}/diff", 
+                    url: Some(format!("{}/api/changes/{}/{}/diff", 
                         self.config.tracker_api_url, 
                         change.service, 
                         change.timestamp
-                    ),
+                    )),
                 },
-                footer: DiscordEmbedFooter {
+                footer: Some(DiscordEmbedFooter {
                     text: format!("Change ID: {}", change.timestamp),
+                }),
+            }],
+        };
+
+        // Send the webhook
+        self.client.post(&service_config.webhook_url)
+            .json(&webhook)
+            .send()
+            .await
+            .context("Failed to send Discord webhook")?;
+
+        Ok(())
+    }
+
+    pub async fn notify_error(&self, service_name: &str, error_message: &str) -> Result<()> {
+        // Check if we have a dedicated error webhook URL
+        if let Some(error_webhook_url) = &self.config.error_webhook_url {
+            // Create a generic error webhook with all services in one place
+            let webhook = DiscordWebhook {
+                content: None,
+                embeds: vec![DiscordEmbed {
+                    title: Some(format!("Error: {}", service_name)),
+                    description: format!("```\n{}\n```", error_message),
+                    color: 16711680, // Red color
+                    author: DiscordEmbedAuthor {
+                        name: "Discovery Document Tracker".to_string(),
+                        url: None,
+                    },
+                    footer: None,
+                }],
+            };
+
+            // Send to the error webhook URL
+            self.client.post(error_webhook_url)
+                .json(&webhook)
+                .send()
+                .await
+                .context("Failed to send error Discord webhook")?;
+
+            return Ok(());
+        }
+
+        // If no dedicated error webhook, fall back to service-specific webhook
+        let service_config = self.config.services
+            .iter()
+            .find(|s| s.service == service_name)
+            .context("Service not found in Discord webhook configuration")?;
+
+        // Create the webhook payload
+        let webhook = DiscordWebhook {
+            content: None,
+            embeds: vec![DiscordEmbed {
+                title: Some("Service Error".to_string()),
+                description: format!("```\n{}\n```", error_message),
+                color: 16711680, // Red color
+                author: DiscordEmbedAuthor {
+                    name: service_config.name.clone(),
+                    url: None,
                 },
+                footer: None,
             }],
         };
 

@@ -68,11 +68,52 @@ async fn main() -> Result<()> {
     loop {
         info!("Starting discovery document check");
 
-        // Fetch and parse documents
-        let parsed_documents = match fetcher.fetch_all().await {
-            Ok(results) => parser::parse_all_documents(results)?,
+        // Fetch documents
+        let fetch_results = match fetcher.fetch_all().await {
+            Ok(results) => results,
             Err(e) => {
-                error!("Error occurred while fetching documents: {}", e);
+                error!("Critical error occurred while fetching documents: {}", e);
+                // Wait and retry
+                time::sleep(Duration::from_secs(config.check_interval)).await;
+                continue;
+            }
+        };
+
+        // Separate successful fetches from failures
+        let mut successful_fetches = Vec::new();
+        let mut failed_fetches = Vec::new();
+
+        for result in fetch_results {
+            match (&result.content, &result.error) {
+                (Some(content), None) => {
+                    successful_fetches.push((result.service, content.clone()));
+                }
+                (None, Some(error_msg)) => {
+                    error!("Failed to fetch service {}: {}", result.service, error_msg);
+                    failed_fetches.push((result.service, error_msg.clone()));
+                }
+                _ => {
+                    error!("Unexpected result state for service {}", result.service);
+                }
+            }
+        }
+
+        // Notify about fetch failures
+        if let Some(notifier) = &discord_notifier {
+            for (service, error_msg) in &failed_fetches {
+                info!("Sending error notification for service: {}", service);
+                if let Err(e) = notifier.notify_error(service, error_msg).await {
+                    error!("Failed to send error notification for service {}: {}", service, e);
+                }
+            }
+        }
+
+        // Parse documents that were fetched successfully
+        let parsed_documents = match parser::parse_all_documents(successful_fetches) {
+            Ok(docs) => docs,
+            Err(e) => {
+                error!("Error occurred while parsing documents: {}", e);
+                time::sleep(Duration::from_secs(config.check_interval)).await;
                 continue;
             }
         };
@@ -107,9 +148,14 @@ async fn main() -> Result<()> {
         // Check for removed services
         for service in stored_documents.keys() {
             if !parsed_documents.contains_key(service) {
-                warn!("Service no longer available: {}", service);
-                // You might want to implement a method to mark services as inactive or remove them
-                // storage.mark_inactive(service)?;
+                // Don't report services that failed to fetch as removed
+                let is_failed = failed_fetches.iter().any(|(failed_service, _)| failed_service == service);
+                
+                if !is_failed {
+                    warn!("Service no longer available: {}", service);
+                    // You might want to implement a method to mark services as inactive or remove them
+                    // storage.mark_inactive(service)?;
+                }
             }
         }
 

@@ -1,10 +1,18 @@
-use anyhow::{Result, Context};
+use anyhow::{Result, Context, anyhow};
 use reqwest::Client;
+use tracing::warn;
 use crate::config::{Config, ServiceConfig};
 
 pub struct Fetcher {
     client: Client,
     config: Config,
+}
+
+#[derive(Debug)]
+pub struct FetchResult {
+    pub service: String,
+    pub content: Option<String>,
+    pub error: Option<String>,
 }
 
 impl Fetcher {
@@ -13,12 +21,27 @@ impl Fetcher {
         Ok(Fetcher { client, config })
     }
 
-    pub async fn fetch_all(&self) -> Result<Vec<(String, String)>> {
+    pub async fn fetch_all(&self) -> Result<Vec<FetchResult>> {
         let mut results = Vec::new();
         for service in &self.config.services {
-            let content = self.fetch_document(service).await
-                .with_context(|| format!("Failed to fetch document for service: {}", service.service))?;
-            results.push((service.service.clone(), content));
+            match self.fetch_document(service).await {
+                Ok(content) => {
+                    results.push(FetchResult {
+                        service: service.service.clone(),
+                        content: Some(content),
+                        error: None,
+                    });
+                }
+                Err(e) => {
+                    let error_msg = format!("Failed to fetch document for service {}: {}", service.service, e);
+                    warn!("{}", error_msg);
+                    results.push(FetchResult {
+                        service: service.service.clone(),
+                        content: None,
+                        error: Some(error_msg),
+                    });
+                }
+            }
         }
         Ok(results)
     }
@@ -35,8 +58,23 @@ impl Fetcher {
             request = request.header("x-goog-spatula", spatula);
         }
 
-        let response = request.send().await?;
-        let content = response.text().await?;
+        let response = request.send().await
+            .with_context(|| format!("HTTP request failed for service: {}", service.service))?;
+            
+        if !response.status().is_success() {
+            return Err(anyhow!("Received non-success status code: {} for service: {}", 
+                response.status(), service.service));
+        }
+        
+        let content = response.text().await
+            .with_context(|| format!("Failed to read response body for service: {}", service.service))?;
+            
+        // Basic validation that it's a valid discovery document
+        if !content.contains("\"discoveryVersion\"") {
+            return Err(anyhow!("Response doesn't appear to be a valid discovery document for service: {}", 
+                service.service));
+        }
+        
         Ok(content)
     }
 

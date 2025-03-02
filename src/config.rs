@@ -30,6 +30,7 @@ pub struct DiscordWebhookConfig {
     pub tracker_api_url: String,
     pub tag_mention_role_ids: Vec<TagMentionRoleId>,
     pub services: Vec<ServiceWebhook>,
+    pub error_webhook_url: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]

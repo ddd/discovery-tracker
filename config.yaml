@@ -11,6 +11,8 @@ check_interval: 3600  # 1 hour
 enable_discord_webhooks: false
 discord_webhook_config:
   tracker_api_url: https://example.com
+  # All errors can be sent to this dedicated webhook URL (optional)
+  error_webhook_url: https://discord.com/api/webhooks/errors/redacted
   tag_mention_role_ids:
     - tag: new_method
       role_id: 1315221536483053590 # change this
