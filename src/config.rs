@@ -32,6 +32,8 @@ pub struct DiscordWebhookConfig {
     pub services: Vec<ServiceWebhook>,
     pub error_webhook_url: Option<String>,
     pub error_mention_role_id: Option<String>,
+    #[serde(default)]
+    pub skip_revision_only_changes: bool,
 }
 
 #[derive(Clone, Deserialize)]

@@ -128,10 +128,24 @@ async fn main() -> Result<()> {
                 if !changes.modifications.is_empty() || !changes.additions.is_empty() || !changes.deletions.is_empty() {
                     info!("Changes detected for service: {}", service);
                     let logged_change = change_logger.log_changes(changes, &old_doc, &new_doc).await?;
-
+                
+                    // Check if changes only contain revision updates
+                    let is_revision_change_only = logged_change.modifications.len() == 1 
+                        && logged_change.additions.is_empty() 
+                        && logged_change.deletions.is_empty()
+                        && logged_change.modifications[0].path == "revision";
+                
                     if let Some(notifier) = &discord_notifier {
-                        if let Err(e) = notifier.notify(&logged_change).await {
-                            error!("Failed to send Discord notification: {}", e);
+                        let should_skip = is_revision_change_only && 
+                            notifier.config.skip_revision_only_changes;
+                            
+                        if !should_skip {
+                            info!("Sending webhook notification for service changes: {}", service);
+                            if let Err(e) = notifier.notify(&logged_change).await {
+                                error!("Failed to send Discord notification: {}", e);
+                            }
+                        } else {
+                            info!("Skipping webhook notification for revision-only change on service: {}", service);
                         }
                     }
                 } else {

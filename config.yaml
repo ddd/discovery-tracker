@@ -15,6 +15,8 @@ discord_webhook_config:
   error_webhook_url: https://discord.com/api/webhooks/errors/redacted
   # Role ID to mention when errors occur (optional)
   error_mention_role_id: 1315221800000000000 # change this to your error role ID
+  # Skip webhook notifications for changes that only affect the revision field
+  skip_revision_only_changes: true
   tag_mention_role_ids:
     - tag: new_method
       role_id: 1315221536483053590 # change this

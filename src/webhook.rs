@@ -32,7 +32,7 @@ struct DiscordEmbedFooter {
 
 pub struct DiscordNotifier {
     client: Client,
-    config: DiscordWebhookConfig,
+    pub config: DiscordWebhookConfig,
 }
 
 impl DiscordNotifier {
