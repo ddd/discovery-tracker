@@ -31,6 +31,7 @@ pub struct DiscordWebhookConfig {
     pub tag_mention_role_ids: Vec<TagMentionRoleId>,
     pub services: Vec<ServiceWebhook>,
     pub error_webhook_url: Option<String>,
+    pub error_mention_role_id: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]

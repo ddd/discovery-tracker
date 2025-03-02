@@ -88,11 +88,17 @@ impl DiscordNotifier {
     }
 
     pub async fn notify_error(&self, service_name: &str, error_message: &str) -> Result<()> {
+        // Build error mention if configured
+        let error_mention = match &self.config.error_mention_role_id {
+            Some(role_id) => Some(format!("<@&{}>", role_id)),
+            None => None,
+        };
+
         // Check if we have a dedicated error webhook URL
         if let Some(error_webhook_url) = &self.config.error_webhook_url {
             // Create a generic error webhook with all services in one place
             let webhook = DiscordWebhook {
-                content: None,
+                content: error_mention,
                 embeds: vec![DiscordEmbed {
                     title: Some(format!("Error: {}", service_name)),
                     description: format!("```\n{}\n```", error_message),
@@ -123,7 +129,7 @@ impl DiscordNotifier {
 
         // Create the webhook payload
         let webhook = DiscordWebhook {
-            content: None,
+            content: error_mention,
             embeds: vec![DiscordEmbed {
                 title: Some("Service Error".to_string()),
                 description: format!("```\n{}\n```", error_message),
